@@ -2,7 +2,7 @@
 
 一支**純前端、單一 HTML 檔**的小工具,可以**瀏覽** LINE 商店的貼圖組、**播放**動畫貼圖(APNG)、並整組**下載**成 ZIP 或產生**可離線使用**的版本。沒有後端、沒有建置步驟,打開即用。
 
-> ℹ️ **本 repo 不含可執行檔。** 這裡只放建置規格與說明;實際的 `line-sticker-player.html` 請依 [`CLAUDE.md`](./CLAUDE.md) 自行產生(見下方)。本 repo 也**不含任何貼圖素材**。
+> ℹ️ **本 repo 不含可執行檔。** 這裡只放建置規格與說明;實際的 [line-sticker-player.html](https://rencheng0525.github.io/line-sticker-player/line-sticker-player.html) 請依 [`CLAUDE.md`](./CLAUDE.md) 自行產生(見下方)。本 repo 也**不含任何貼圖素材**。
 
 ## 功能
 
