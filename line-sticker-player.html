@@ -1,0 +1,489 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>LINE Sticker Player — 瀏覽 / 播放 / 下載</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%2016%2016'%3E%3Ccircle%20cx='8'%20cy='8'%20r='7'%20fill='%231ee36a'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<style>
+  :root{
+    --bg:#0d100e; --panel:#161b18; --panel-2:#1e2521;
+    --green:#1ee36a; --red:#ff453a; --amber:#ffcb47;
+    --text:#eef2ee; --muted:#8b948c; --line:#2b332d;
+    --cell:140px;
+    --mono:"IBM Plex Mono",ui-monospace,monospace;
+    --disp:"Space Grotesk",system-ui,sans-serif;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0}
+  body{ background:var(--bg); color:var(--text); font-family:var(--disp); line-height:1.5; -webkit-font-smoothing:antialiased; padding:0 0 4rem; }
+  a{color:var(--green)}
+  .wrap{max-width:1040px; margin:0 auto; padding:0 20px}
+
+  header{ border-bottom:1px solid var(--line); background:linear-gradient(#11150f,#0d100e); position:sticky; top:0; z-index:5; }
+  .head-in{display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:12px; padding:14px 0}
+  .brand{font-size:19px; font-weight:700; letter-spacing:-.01em}
+  .brand i{color:var(--muted); font-weight:400; font-size:13px; margin-left:8px}
+  .tabs{display:inline-flex; background:var(--panel); border:1px solid var(--line); border-radius:11px; padding:3px; gap:3px}
+  .tab{background:transparent; border:0; color:var(--muted); padding:7px 18px; border-radius:8px; font-weight:500; font-size:14px; cursor:pointer; font-family:var(--disp)}
+  .tab:hover{color:var(--text)}
+  .tab.active{background:var(--green); color:#06210f}
+
+  .view{display:none; padding-top:10px}
+  .view.active{display:block}
+
+  .bar{display:flex; flex-wrap:wrap; gap:10px; align-items:center; padding:14px 0}
+  .field{display:flex; align-items:center; gap:8px; background:var(--panel); border:1px solid var(--line); border-radius:10px; padding:6px 6px 6px 12px}
+  .field label{font-size:12px; color:var(--muted); letter-spacing:.08em; text-transform:uppercase}
+  input[type=text]{ font-family:var(--mono); font-size:15px; background:transparent; border:0; color:var(--text); width:120px; padding:6px 4px; outline:none; }
+  select{ font-family:var(--disp); font-size:14px; background:var(--panel); color:var(--text); border:1px solid var(--line); border-radius:10px; padding:9px 12px; outline:none; }
+  button{ font-family:var(--disp); font-size:14px; font-weight:500; cursor:pointer; background:var(--panel-2); color:var(--text); border:1px solid var(--line); border-radius:9px; padding:9px 14px; transition:.12s; }
+  button:hover{border-color:#3c473f; background:#242c27}
+  button:active{transform:scale(.97)}
+  button:disabled{opacity:.4; cursor:default}
+  button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible{outline:2px solid var(--green); outline-offset:2px}
+  button.go{background:var(--green); color:#06210f; border-color:var(--green); font-weight:700}
+  button.go:hover{background:#34ee7c}
+  button.ghost{background:transparent; border-color:transparent; color:var(--muted); padding:9px 8px}
+  button.ghost:hover{background:var(--panel); color:var(--text)}
+  .spacer{flex:1 1 30px}
+  .sizebox{display:flex; align-items:center; gap:10px; color:var(--muted); font-size:13px}
+  input[type=range]{accent-color:var(--green); width:120px}
+  .pager{display:flex; align-items:center; gap:8px; color:var(--muted); font-size:13px; font-family:var(--mono)}
+  .ziplink{font-family:var(--mono); font-size:13px; color:var(--muted); text-decoration:none; padding:9px 4px}
+  .ziplink:hover{color:var(--green)}
+
+  .status{padding:8px 0; color:var(--muted); font-family:var(--mono); font-size:14px; min-height:20px}
+  .status.err{color:var(--amber)}
+
+  .sets{display:grid; grid-template-columns:repeat(auto-fill,minmax(160px,1fr)); gap:14px; padding:6px 0 4px}
+  .setcard{background:var(--panel); border:1px solid var(--line); border-radius:14px; overflow:hidden; display:flex; flex-direction:column}
+  .setthumb{width:100%; aspect-ratio:1/1; object-fit:contain; padding:10%; background:#20271f}
+  .setmeta{padding:9px 11px; flex:1}
+  .setname{font-size:13.5px; font-weight:500; line-height:1.35; max-height:2.7em; overflow:hidden}
+  .setsub{font-family:var(--mono); font-size:11px; color:var(--muted); margin-top:4px}
+  .setcard .open{border:0; border-top:1px solid var(--line); border-radius:0; background:transparent; color:var(--green); padding:9px; font-weight:500}
+  .setcard .open:hover{background:var(--panel-2)}
+
+  .grid{display:grid; grid-template-columns:repeat(auto-fill,minmax(var(--cell),1fr)); gap:14px; padding:14px 0}
+  .card{ background:var(--panel); border:1px solid var(--line); border-radius:14px; overflow:hidden; display:flex; flex-direction:column; }
+  .stage{ position:relative; aspect-ratio:1/1; display:flex; align-items:center; justify-content:center; background-color:#20271f;
+    background-image:linear-gradient(45deg,#1a201a 25%,transparent 25%),linear-gradient(-45deg,#1a201a 25%,transparent 25%),linear-gradient(45deg,transparent 75%,#1a201a 75%),linear-gradient(-45deg,transparent 75%,#1a201a 75%);
+    background-size:18px 18px; background-position:0 0,0 9px,9px -9px,-9px 0; }
+  .stage img{max-width:86%; max-height:86%}
+  .badge{position:absolute; top:7px; left:7px; font-family:var(--mono); font-size:11px; color:var(--muted); background:rgba(0,0,0,.45); padding:2px 7px; border-radius:6px}
+  .paused-tag{position:absolute; inset:0; display:none; align-items:center; justify-content:center; color:var(--amber); font-family:var(--mono); font-size:12px; letter-spacing:.1em; background:rgba(0,0,0,.25)}
+  .card.paused .paused-tag{display:flex}
+  .row{display:flex; border-top:1px solid var(--line)}
+  .row button{flex:1; border:0; border-radius:0; background:transparent; color:var(--muted); padding:9px 4px; font-size:13px}
+  .row button + button{border-left:1px solid var(--line)}
+  .row button:hover{background:var(--panel-2); color:var(--text)}
+  .empty{padding:48px 0; text-align:center; color:var(--muted)}
+  .empty .big{font-size:17px; color:var(--text); margin-bottom:6px}
+
+  details{border-top:1px solid var(--line); margin-top:10px}
+  summary{cursor:pointer; padding:14px 0; color:var(--muted); font-size:14px; list-style:none}
+  summary::-webkit-details-marker{display:none}
+  summary::before{content:"▸ "; color:var(--green)}
+  details[open] summary::before{content:"▾ "}
+  .adv{display:grid; gap:18px; padding:0 0 18px; grid-template-columns:repeat(auto-fit,minmax(230px,1fr))}
+  .adv h3{margin:0 0 8px; font-size:14px; font-weight:500}
+  .adv p{margin:0 0 10px; font-size:12.5px; color:var(--muted)}
+  textarea{ width:100%; min-height:84px; resize:vertical; font-family:var(--mono); font-size:13px; background:var(--panel); border:1px solid var(--line); border-radius:10px; color:var(--text); padding:10px; outline:none; }
+  .adv button{margin-top:10px}
+
+  footer{color:var(--muted); font-size:12px; line-height:1.7; padding-top:22px; border-top:1px solid var(--line); margin-top:18px}
+  footer code{font-family:var(--mono); color:#aeb8af; background:var(--panel); padding:1px 6px; border-radius:5px}
+
+  @media (max-width:680px){ .brand i{display:none} }
+  @media (prefers-reduced-motion:reduce){ *{animation:none!important} }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="wrap head-in">
+    <div class="brand">LINE Sticker Player <i>browse · play · save</i></div>
+    <div class="tabs" role="tablist">
+      <button class="tab active" data-view="browse" role="tab">瀏覽</button>
+      <button class="tab" data-view="player" role="tab">播放器</button>
+    </div>
+  </div>
+</header>
+
+<div class="wrap">
+
+  <!-- ===== BROWSE ===== -->
+  <section id="view-browse" class="view active">
+    <div class="bar">
+      <select id="cat" title="分類">
+        <option value="1000014">動態貼圖</option>
+        <option value="1000073">全螢幕貼圖</option>
+        <option value="1000082">特效貼圖</option>
+        <option value="1000080">大貼圖</option>
+        <option value="1000081">訊息貼圖</option>
+        <option value="1000077">隨你填貼圖</option>
+        <option value="1000015">動畫</option>
+        <option value="1">LINE FRIENDS</option>
+        <option value="2">迪士尼</option>
+        <option value="8">幽默搞笑</option>
+        <option value="9">吉祥物</option>
+      </select>
+      <button class="go" id="loadList">載入清單</button>
+      <span class="pager">
+        <button id="prev" disabled>‹</button>
+        <span id="pageLabel">第 1 頁</span>
+        <button id="next">›</button>
+      </span>
+    </div>
+    <div class="status" id="setStatus">挑一個分類按「載入清單」。若代理被擋,用下方「方法 C」貼上頁面內容即可,零連線。</div>
+    <div class="sets" id="sets"></div>
+
+    <details>
+      <summary>方法 C — 代理被擋時,手動貼上清單(零連線)</summary>
+      <div class="adv">
+        <div>
+          <h3>貼商店分類頁內容</h3>
+          <p>瀏覽器開啟分類頁,全選複製貼進來,解析成上方清單。HTML 或文字皆可。</p>
+          <textarea id="pagesrc" placeholder="貼上 showcase 分類頁的內容…"></textarea>
+          <button id="loadPageSrc">解析清單</button>
+        </div>
+      </div>
+    </details>
+  </section>
+
+  <!-- ===== PLAYER ===== -->
+  <section id="view-player" class="view">
+    <div class="bar">
+      <button class="ghost" id="backToList">‹ 清單</button>
+      <div class="field">
+        <label for="pid">ID</label>
+        <input type="text" id="pid" value="1399310" inputmode="numeric" spellcheck="false">
+      </div>
+      <button class="go" id="load">載入</button>
+      <button id="toggleAll" disabled>全部暫停</button>
+      <span class="spacer"></span>
+      <button id="dlZip" disabled title="把每張動畫抓下來,以 ID.png 命名打包成一個 ZIP">下載全部 (ZIP)</button>
+      <button id="dlOffline" disabled title="把所有動畫內嵌成一個可播放/暫停的 HTML,打開即用、永不需連網">產生離線版 HTML</button>
+    </div>
+    <div class="bar" style="padding-top:0">
+      <span class="sizebox">大小 <input type="range" id="size" min="90" max="230" value="140"></span>
+      <span class="spacer"></span>
+      <a class="ziplink" id="zip" href="#" target="_blank" rel="noopener" hidden>↓ 官方整包 ZIP(一鍵、不受 CORS 影響)</a>
+    </div>
+
+    <div class="status" id="status"></div>
+    <div class="grid" id="grid"></div>
+    <div class="empty" id="empty">
+      <div class="big">輸入貼圖組 ID 按「載入」,或回「瀏覽」分頁挑一組</div>
+      <div>預設帶了一個範例 ID(1399310);換成任何貼圖組 ID 都行。載入後可整組下載或產生離線版。</div>
+    </div>
+
+    <details>
+      <summary>方法 A / B — 手動載入(抓不到清單時用)</summary>
+      <div class="adv">
+        <div>
+          <h3>方法 A — 直接貼 sticker ID</h3>
+          <p>用逗號、空格或換行分隔,例如 <code>12345 12346</code></p>
+          <textarea id="ids" placeholder="把每張貼圖的 id 貼進來…"></textarea>
+          <button id="loadIds">用 ID 載入</button>
+        </div>
+        <div>
+          <h3>方法 B — 貼 productInfo.meta</h3>
+          <p>開啟 <code>.../product/ID/iphone/productInfo.meta</code>,把整段 JSON 貼進來。</p>
+          <textarea id="meta" placeholder='{ "stickers":[ {"id":12345}, ... ] }'></textarea>
+          <button id="loadMeta">解析 JSON</button>
+        </div>
+      </div>
+    </details>
+  </section>
+
+  <footer>
+    <code>瀏覽</code> 分頁從商店找貼圖組 → <code>播放器</code> 分頁載入並播放 → 整組 <code>下載 / 離線版</code> 保存。<br>
+    瀏覽需連 <code>store.line.me</code>,會依序試多個公開代理(jina / allorigins / corsproxy / thingproxy)繞過跨來源;全失敗時用「方法 C」貼頁面內容,或「方法 A/B」直接給 ID。<br>
+    端點為非官方、未公開。貼圖版權屬原作者所有,本工具僅供個人預覽研究,請勿散布或商用。
+  </footer>
+
+</div>
+
+<script>
+const CDN='https://stickershop.line-scdn.net/stickershop/v1';
+const STORE='https://store.line.me/stickershop/showcase/top/zh-Hant';
+const animUrl  =id=>`${CDN}/sticker/${id}/iphone/sticker_animation@2x.png`;
+const staticUrl=id=>`${CDN}/sticker/${id}/iphone/sticker@2x.png`;
+const mainUrl  =id=>`${CDN}/product/${id}/LINEStorePC/main.png`;
+const metaUrl  =pid=>`${CDN}/product/${pid}/iphone/productInfo.meta`;
+const zipUrl   =pid=>`${CDN}/product/${pid}/iphone/stickerpack@2x.zip`;
+const ENC=encodeURIComponent;
+
+const $=s=>document.querySelector(s);
+const grid=$('#grid'), statusEl=$('#status'), emptyEl=$('#empty');
+const toggleAll=$('#toggleAll'), zipEl=$('#zip'), dlZip=$('#dlZip'), dlOffline=$('#dlOffline');
+const setsEl=$('#sets'), setStatusEl=$('#setStatus'), pageLabel=$('#pageLabel');
+const reduceMotion=matchMedia('(prefers-reduced-motion:reduce)').matches;
+let allPaused=false, currentIds=[], currentPid='', busy=false, curPage=1;
+
+function setStatus(m,e){ statusEl.textContent=m||''; statusEl.classList.toggle('err',!!e); }
+function setSetStatus(m,e){ setStatusEl.textContent=m||''; setStatusEl.classList.toggle('err',!!e); }
+
+/* ---------- tab switching ---------- */
+function showView(name){
+  document.querySelectorAll('.view').forEach(v=>v.classList.toggle('active', v.id==='view-'+name));
+  document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('active', t.dataset.view===name));
+  window.scrollTo({top:0,behavior:'instant'in document.documentElement.style?'instant':'auto'});
+}
+document.querySelectorAll('.tab').forEach(t=>t.onclick=()=>showView(t.dataset.view));
+$('#backToList').onclick=()=>showView('browse');
+
+/* ---------- proxy chain ---------- */
+const SRC={
+  direct:u=>({u}),
+  jina:  u=>({u:'https://r.jina.ai/'+u}),
+  ag:    u=>({u:'https://api.allorigins.win/get?url='+ENC(u), json:1}),
+  cors:  u=>({u:'https://corsproxy.io/?url='+ENC(u)}),
+  thing: u=>({u:'https://thingproxy.freeboard.io/fetch/'+u}),
+  agraw: u=>({u:'https://api.allorigins.win/raw?url='+ENC(u)})
+};
+async function getText(url,order){
+  for(const k of order){ const s=SRC[k](url);
+    try{ const r=await fetch(s.u,{cache:'no-store'}); if(!r.ok) continue;
+      const t=s.json?((await r.json()).contents):await r.text();
+      if(t&&t.length) return t;
+    }catch(e){} }
+  throw new Error('all sources failed');
+}
+async function getBlob(url,order){
+  for(const k of order){ const s=SRC[k](url);
+    try{ const r=await fetch(s.u,{cache:'no-store'}); if(!r.ok) continue;
+      const b=await r.blob(); if(b&&b.size) return b;
+    }catch(e){} }
+  throw new Error('all sources failed');
+}
+
+/* ---------- parsing (HTML or markdown) ---------- */
+function cleanName(raw){
+  raw=(raw||'').replace(/\s+/g,' ').trim();
+  let name=raw.replace(/Animation\s*&\s*Sound icon/ig,'').replace(/Animation only icon/ig,'')
+             .replace(/Popup only icon/ig,'').replace(/Effect only icon/ig,'').replace(/Sound icon/ig,'').replace(/\s+/g,' ').trim();
+  let type='';
+  if(/Animation\s*&\s*Sound/i.test(raw)) type='動+聲';
+  else if(/Animation only/i.test(raw)) type='動態';
+  else if(/Effect/i.test(raw)) type='特效';
+  else if(/Popup/i.test(raw)) type='全螢幕';
+  else if(/Sound/i.test(raw)) type='有聲';
+  const h=Math.floor(name.length/2);
+  if(name.length>1 && name.slice(0,h).trim()===name.slice(h).trim()) name=name.slice(0,h).trim();
+  if(!name) name='(無標題)';
+  return {name,type};
+}
+function parseSets(text){
+  const out=new Map();
+  const add=(id,raw)=>{ if(out.has(id))return; const c=cleanName(raw); out.set(id,{id,name:c.name,type:c.type}); };
+  const md=/\[([^\]]*)\]\([^)]*\/stickershop\/product\/(\d+)[^)]*\)/g; let m;
+  while((m=md.exec(text))) add(m[2],m[1]);
+  if(out.size===0){
+    try{ const doc=new DOMParser().parseFromString(text,'text/html');
+      doc.querySelectorAll('a[href*="/stickershop/product/"]').forEach(a=>{
+        const mm=(a.getAttribute('href')||'').match(/\/stickershop\/product\/(\d+)/); if(mm) add(mm[1], a.textContent||''); });
+    }catch(e){}
+  }
+  if(out.size===0){ const re=/\/stickershop\/product\/(\d+)/g; let r; while((r=re.exec(text))) if(!out.has(r[1])) out.set(r[1],{id:r[1],name:'#'+r[1],type:''}); }
+  return [...out.values()];
+}
+
+/* ---------- browse ---------- */
+function renderSets(sets){
+  setsEl.innerHTML='';
+  sets.forEach(s=>{
+    const card=document.createElement('div'); card.className='setcard';
+    const th=document.createElement('img'); th.className='setthumb'; th.loading='lazy'; th.alt=s.name; th.src=mainUrl(s.id);
+    th.onerror=()=>{ th.src=staticUrl(s.id); th.onerror=()=>{th.style.visibility='hidden';}; };
+    const meta=document.createElement('div'); meta.className='setmeta';
+    const nm=document.createElement('div'); nm.className='setname'; nm.textContent=s.name;
+    const sub=document.createElement('div'); sub.className='setsub'; sub.textContent=s.id+(s.type?' · '+s.type:'');
+    meta.append(nm,sub);
+    const open=document.createElement('button'); open.className='open'; open.textContent='開啟 ▸';
+    open.onclick=()=>{ $('#pid').value=s.id; showView('player'); loadByProduct(s.id); };
+    card.append(th,meta,open); setsEl.appendChild(card);
+  });
+}
+async function loadList(){
+  const cat=$('#cat').value;
+  setSetStatus('載入清單中…(嘗試多個代理)'); setsEl.innerHTML=''; resetPlayer();
+  let text;
+  try{ text=await getText(`${STORE}?category=${cat}&page=${curPage}`,['jina','ag','cors','thing']); }
+  catch(e){ setSetStatus('所有代理都失敗了。請用「方法 C」貼上分類頁內容,或到「播放器」用 ID 載入。',true); return; }
+  const sets=parseSets(text);
+  if(!sets.length){ setSetStatus('沒解析到貼圖組(代理可能回了錯誤頁)。試試「方法 C」。',true); return; }
+  renderSets(sets);
+  pageLabel.textContent='第 '+curPage+' 頁'; $('#prev').disabled=curPage<=1;
+  setSetStatus(`第 ${curPage} 頁 · ${sets.length} 組,點「開啟」即跳到播放器載入。`);
+}
+
+/* ---------- player ---------- */
+function makeCard(id){
+  const card=document.createElement('div'); card.className='card';
+  const stage=document.createElement('div'); stage.className='stage';
+  const img=document.createElement('img'); img.alt='sticker '+id; img.loading='lazy';
+  img.dataset.id=id; img.dataset.playing='1'; img.dataset.staticOnly='0'; img.src=animUrl(id);
+  img.onerror=()=>{ if(img.dataset.staticOnly==='0'){img.dataset.staticOnly='1';img.src=staticUrl(id);} else{stage.innerHTML='<span style="color:#7d877f;font-family:var(--mono);font-size:12px">無法載入</span>';} };
+  const badge=document.createElement('span'); badge.className='badge'; badge.textContent=id;
+  const tag=document.createElement('div'); tag.className='paused-tag'; tag.textContent='已暫停';
+  stage.append(img,badge,tag);
+  const row=document.createElement('div'); row.className='row';
+  const bToggle=btn('暫停', ()=>{ isPlaying(img)?pause(card,img):play(card,img); bToggle.textContent=isPlaying(img)?'暫停':'播放'; });
+  const bReplay=btn('重播', ()=>{ play(card,img); bToggle.textContent='暫停'; });
+  const bOpen=btn('原圖', ()=>{ window.open(img.dataset.staticOnly==='1'?staticUrl(id):animUrl(id),'_blank','noopener'); });
+  row.append(bToggle,bReplay,bOpen); card.append(stage,row);
+  if(reduceMotion){ pause(card,img); bToggle.textContent='播放'; }
+  return card;
+}
+function btn(label,fn){ const b=document.createElement('button'); b.textContent=label; b.onclick=fn; return b; }
+const isPlaying=img=>img.dataset.playing==='1';
+function play(card,img){ img.dataset.playing='1'; card.classList.remove('paused'); img.src=animUrl(img.dataset.id)+'?cb='+Date.now(); }
+function pause(card,img){ img.dataset.playing='0'; card.classList.add('paused'); img.src=staticUrl(img.dataset.id); }
+
+function render(ids){
+  grid.innerHTML='';
+  if(!ids.length){ setStatus('清單是空的,或格式無法辨識。',true); return; }
+  ids.forEach(id=>grid.appendChild(makeCard(id)));
+  emptyEl.style.display='none';
+  currentIds=ids.slice();
+  toggleAll.disabled=false; dlZip.disabled=false; dlOffline.disabled=false;
+  allPaused=false; toggleAll.textContent='全部暫停';
+  setStatus(`已載入 ${ids.length} 張`);
+}
+function resetPlayer(){
+  grid.innerHTML=''; currentIds=[]; currentPid=''; allPaused=false;
+  emptyEl.style.display='';
+  toggleAll.disabled=true; dlZip.disabled=true; dlOffline.disabled=true;
+  toggleAll.textContent='全部暫停';
+  zipEl.hidden=true; setStatus('');
+}
+
+function extractIds(json){ let a=Array.isArray(json)?json:(json.stickers||[]); return a.map(s=>typeof s==='object'?s.id:s).filter(v=>v!=null); }
+async function loadByProduct(pid){
+  pid=String(pid).trim().replace(/\D/g,'');
+  if(!pid){ setStatus('請輸入有效的數字 ID。',true); return; }
+  currentPid=pid; setStatus('抓取清單中…');
+  zipEl.hidden=false; zipEl.href=zipUrl(pid);
+  let text;
+  try{ text=await getText(metaUrl(pid),['direct','ag','cors','thing']); }
+  catch(e){ setStatus('抓不到清單(跨來源限制)。請用「方法 A/B」手動載入。',true); return; }
+  let json; try{ json=JSON.parse(text); }catch(e){ setStatus('清單回傳格式異常,請改用「方法 B」貼上 meta JSON。',true); return; }
+  render(extractIds(json));
+}
+
+/* ---------- save ---------- */
+function saveBlob(blob,name){ const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=name; document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(a.href),5000); }
+function blobToDataURL(b){ return new Promise((res,rej)=>{const r=new FileReader();r.onload=()=>res(r.result);r.onerror=rej;r.readAsDataURL(b);}); }
+async function grabAll(onItem){
+  let ok=0, fail=0;
+  for(let i=0;i<currentIds.length;i++){
+    const id=currentIds[i];
+    setStatus(`抓取中… ${i+1}/${currentIds.length}（成功 ${ok}・失敗 ${fail}）`);
+    let blob=null;
+    try{ blob=await getBlob(animUrl(id),['direct','cors','thing','agraw']); }
+    catch(e){ try{ blob=await getBlob(staticUrl(id),['direct','cors','thing','agraw']); }catch(e2){ fail++; continue; } }
+    await onItem(id,blob); ok++;
+  }
+  return {ok,fail};
+}
+async function downloadAllZip(){
+  if(busy||!currentIds.length) return; busy=true; lockBtns(true);
+  try{
+    const zip=new JSZip();
+    const {ok,fail}=await grabAll((id,blob)=>{ zip.file(`${id}.png`,blob); });
+    if(!ok){ setStatus('讀不到任何位元組:全部代理被擋。請改用「官方整包 ZIP」。',true); return; }
+    setStatus('正在產生 ZIP 檔…');
+    saveBlob(await zip.generateAsync({type:'blob'}), `line-${currentPid||'stickers'}-apng.zip`);
+    setStatus(`完成:${ok} 張已打包${fail?`,${fail} 張失敗`:''}。`);
+  }catch(e){ setStatus('產生 ZIP 失敗:'+e.message,true); }
+  finally{ busy=false; lockBtns(false); }
+}
+async function makeOffline(){
+  if(busy||!currentIds.length) return; busy=true; lockBtns(true);
+  try{
+    const items=[];
+    const {ok,fail}=await grabAll(async(id,blob)=>{ items.push({id,uri:await blobToDataURL(blob)}); });
+    if(!ok){ setStatus('讀不到任何位元組:全部代理被擋。請改用「官方整包 ZIP」。',true); return; }
+    setStatus('正在產生離線版 HTML…');
+    saveBlob(new Blob([buildOffline(items)],{type:'text/html'}), `line-sticker-offline-${currentPid||'set'}.html`);
+    setStatus(`離線版完成:${ok} 張已內嵌${fail?`,${fail} 張失敗`:''}。可播放/暫停,打開即用、永不需連網。`);
+  }catch(e){ setStatus('產生離線版失敗:'+e.message,true); }
+  finally{ busy=false; lockBtns(false); }
+}
+function buildOffline(items){
+  const cards=items.map(it=>`<div class="card" data-playing="1"><div class="stage"><img src="${it.uri}" alt="${it.id}"><canvas></canvas><span class="badge">${it.id}</span></div><div class="row"><button class="t">暫停</button><button class="r">重播</button></div></div>`).join('');
+  return `<!DOCTYPE html><html lang="zh-Hant"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>LINE 貼圖離線版 · ${items.length} 張</title>
+<style>
+:root{--cell:140px}
+*{box-sizing:border-box}
+body{margin:0;background:#0d100e;color:#eef2ee;font-family:system-ui,sans-serif;padding:20px}
+.top{display:flex;flex-wrap:wrap;align-items:center;gap:14px;margin:0 0 18px}
+h1{font-size:20px;font-weight:600;margin:0}
+h1 span{color:#1ee36a}
+button{font:inherit;font-size:14px;cursor:pointer;background:#1e2521;color:#eef2ee;border:1px solid #2b332d;border-radius:9px;padding:8px 13px}
+button:hover{background:#242c27}
+button:active{transform:scale(.97)}
+.sp{flex:1}
+.sz{display:flex;align-items:center;gap:9px;color:#8b948c;font-size:13px}
+input[type=range]{accent-color:#1ee36a}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(var(--cell),1fr));gap:14px}
+.card{background:#161b18;border:1px solid #2b332d;border-radius:14px;overflow:hidden}
+.stage{position:relative;aspect-ratio:1/1;background-color:#20271f;background-image:linear-gradient(45deg,#1a201a 25%,transparent 25%),linear-gradient(-45deg,#1a201a 25%,transparent 25%),linear-gradient(45deg,transparent 75%,#1a201a 75%),linear-gradient(-45deg,transparent 75%,#1a201a 75%);background-size:18px 18px;background-position:0 0,0 9px,9px -9px,-9px 0}
+.stage img,.stage canvas{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;padding:8%}
+.stage canvas{display:none}
+.card[data-playing="0"] .stage::after{content:"❚❚";position:absolute;top:6px;right:9px;color:#ffcb47;font-size:11px}
+.badge{position:absolute;top:7px;left:7px;font-family:ui-monospace,monospace;font-size:11px;color:#8b948c;background:rgba(0,0,0,.45);padding:2px 7px;border-radius:6px}
+.row{display:flex;border-top:1px solid #2b332d}
+.row button{flex:1;border:0;border-radius:0;background:transparent;color:#8b948c;padding:9px 4px;font-size:13px}
+.row button+button{border-left:1px solid #2b332d}
+.row button:hover{background:#1e2521;color:#eef2ee}
+</style></head>
+<body>
+<div class="top"><h1>LINE 貼圖離線版 · <span>${items.length}</span> 張</h1><button id="all">全部暫停</button><span class="sp"></span><span class="sz">大小 <input type="range" id="sz" min="90" max="230" value="140"></span></div>
+<div class="grid">${cards}</div>
+<script>
+var paused=false;
+function snap(card){var img=card.querySelector('img'),cv=card.querySelector('canvas');var w=img.naturalWidth||300,h=img.naturalHeight||300;cv.width=w;cv.height=h;try{cv.getContext('2d').drawImage(img,0,0,w,h);}catch(e){}cv.style.display='block';img.style.visibility='hidden';card.dataset.playing='0';card.querySelector('.t').textContent='播放';}
+function resume(card){card.querySelector('canvas').style.display='none';card.querySelector('img').style.visibility='visible';card.dataset.playing='1';card.querySelector('.t').textContent='暫停';}
+function replay(card){var img=card.querySelector('img');var u=img.src;img.src='';requestAnimationFrame(function(){img.src=u;});resume(card);}
+document.querySelectorAll('.card').forEach(function(card){
+  card.querySelector('.t').onclick=function(){card.dataset.playing==='1'?snap(card):resume(card);};
+  card.querySelector('.r').onclick=function(){replay(card);};
+});
+document.getElementById('all').onclick=function(){paused=!paused;document.querySelectorAll('.card').forEach(function(c){paused?snap(c):resume(c);});this.textContent=paused?'全部播放':'全部暫停';};
+document.getElementById('sz').oninput=function(){document.documentElement.style.setProperty('--cell',this.value+'px');};
+<\/script>
+</body></html>`;
+}
+function lockBtns(on){ [dlZip,dlOffline,toggleAll,$('#load')].forEach(b=>b.disabled=on); }
+
+/* ---------- events ---------- */
+$('#loadList').onclick=()=>{ curPage=1; loadList(); };
+$('#cat').onchange=()=>{ curPage=1; loadList(); };
+$('#prev').onclick=()=>{ if(curPage>1){curPage--; loadList();} };
+$('#next').onclick=()=>{ curPage++; loadList(); };
+$('#loadPageSrc').onclick=()=>{ const sets=parseSets($('#pagesrc').value); if(!sets.length){ setSetStatus('沒解析到貼圖組,確認貼的是分類頁內容。',true); return; } resetPlayer(); renderSets(sets); setSetStatus(`解析到 ${sets.length} 組(手動)。`); };
+
+$('#load').onclick=()=>loadByProduct($('#pid').value);
+$('#pid').addEventListener('keydown',e=>{ if(e.key==='Enter') loadByProduct($('#pid').value); });
+$('#loadIds').onclick=()=>{ const ids=$('#ids').value.split(/[\s,;]+/).map(s=>s.trim()).filter(Boolean); currentPid=''; zipEl.hidden=true; setStatus(''); render(ids); };
+$('#loadMeta').onclick=()=>{ try{ currentPid=''; render(extractIds(JSON.parse($('#meta').value))); }catch(e){ setStatus('JSON 解析失敗,請確認貼上的是完整的 meta 內容。',true); } };
+toggleAll.onclick=()=>{
+  allPaused=!allPaused;
+  document.querySelectorAll('.grid .card').forEach(card=>{ const img=card.querySelector('img'); if(!img) return; const tb=card.querySelector('.row button');
+    if(allPaused){ pause(card,img); tb.textContent='播放'; } else{ play(card,img); tb.textContent='暫停'; } });
+  toggleAll.textContent=allPaused?'全部播放':'全部暫停';
+};
+dlZip.onclick=downloadAllZip;
+dlOffline.onclick=makeOffline;
+$('#size').oninput=e=>document.documentElement.style.setProperty('--cell',e.target.value+'px');
+</script>
+</body>
+</html>
